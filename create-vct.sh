@@ -14,11 +14,6 @@ DEFAULT_USER_PASS="DevelP4ssword"
 NODE_NAME=$(hostname)      
 
 # Function to list available LXC templates
-list_templates() {
-    echo "Available LXC Templates:"
-    ls /var/lib/vz/template/cache/ | grep -E '\.tar\.(gz|zst)$'
-}
-
 setup_users() {
     local vmid="$1"
     local root_password="$2"
@@ -67,15 +62,22 @@ create_lxc() {
     local ram=$2
     local disk=$3
     local cores=$4
+    local as_template=$5
 
-    local base_vmid=$(get_initial_ctid)
+    local base_vmid
+    if $as_template; then
+        base_vmid=$(get_initial_tid)
+    else
+        base_vmid=$(get_initial_ctid)
+    fi
 
     local vmid
-    vmid=$(pvesh get /cluster/nextid)
+    # vmid=$(pvesh get /cluster/nextid)
 
-    if (( $vmid < $base_vmid )); then
-        vmid=$base_vmid
-    fi
+    vmid=$base_vmid
+    while pct status "$vmid" &>/dev/null; do
+        ((vmid++))
+    done
 
     echo "Creating LXC container..."
     echo "  Template: $template"
@@ -93,18 +95,26 @@ create_lxc() {
     echo
 
     if $cmd; then
-        echo "LXC $vmid created and started successfully!"
-        
-        sleep 3
+        if $as_template; then
+            echo "LXC template $vmid created successfully!"
+            pct set "$vmid" --description "LXC template created by $USER on $(date)"
+            pct stop "$vmid"
+            echo "You can now use this as a container template."
+            echo "whit the command 'clone-template.sh <name> $vmid [--disk <tamanho-em-GB>] [--template <template-id>]'"
+        else
+            echo "LXC $vmid created and started successfully!"
+            
+            sleep 3
 
-        setup_users "$vmid" "$DEFAULT_ROOT_PASS" "$DEFAULT_USER" "$DEFAULT_USER_PASS"
+            setup_users "$vmid" "$DEFAULT_ROOT_PASS" "$DEFAULT_USER" "$DEFAULT_USER_PASS"
 
-        echo "Container $vmid setup complete!"
+            echo "Container $vmid setup complete!"
 
-        ip=$(pct exec "$vmid" -- hostname -I | awk '{print $1}')
-        pct set "$vmid" --net0 name=eth0,bridge=$DEFAULT_BRIDGE,ip=${ip}/24,gw=192.168.2.2,ip6=auto,firewall=1
-        pct set "$vmid" --net1 name=eth1,bridge=vmbr1,ip=172.18.32.$((vmid - 100))/24,firewall=1
-        echo "Container IP: $ip"        
+            ip=$(pct exec "$vmid" -- hostname -I | awk '{print $1}')
+            pct set "$vmid" --net0 name=eth0,bridge=$DEFAULT_BRIDGE,ip=${ip}/24,gw=192.168.2.2,ip6=auto,firewall=1
+            pct set "$vmid" --net1 name=eth1,bridge=vmbr1,ip=172.18.32.$((vmid - 100))/24,firewall=1
+            echo "Container IP: $ip"        
+        fi
     else
         echo "Failed to create LXC $vmid. Check logs above."
     fi
@@ -118,6 +128,7 @@ if [ "$#" -eq 0 ]; then
     exit 1
 fi
 
+AS_TEMPLATE=false
 # Argument parsing
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -125,6 +136,7 @@ while [[ "$#" -gt 0 ]]; do
         --ram) ram="$2"; shift ;;
         --disk) disk="$2"; shift ;;
         --cores) cores="$2"; shift ;;
+        --as-template) AS_TEMPLATE=true ;;
         *) echo "Unknown parameter: $1"; exit 1 ;;
     esac
     shift
@@ -143,4 +155,4 @@ if [ -z "$template" ]; then
 fi
 
 # Run creation
-create_lxc "$template" "$ram" "$disk" "$cores"
+create_lxc "$template" "$ram" "$disk" "$cores" "$AS_TEMPLATE"

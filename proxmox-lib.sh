@@ -10,7 +10,8 @@ if [ ! -f "$(dirname "${BASH_SOURCE[0]}")/config.json" ]; then
   cat > "$(dirname "${BASH_SOURCE[0]}")/config.json" <<EOF
 {
   "ctid": {
-    "initial_value": 100
+    "containers": 200,
+    "templates": 100
   }
 }
 EOF
@@ -18,6 +19,18 @@ fi
 
 function get_initial_ctid() {
   local config_file="config.json"
-  local initial_value=$(jq -r ".ctid.initial_value" "$config_file")
-  echo "$initial_value"
+  local containers=$(jq -r ".ctid.containers" "$config_file")
+  echo "$containers"
 }
+
+function get_initial_tid() {
+  local config_file="config.json"
+  local templates=$(jq -r ".ctid.templates" "$config_file")
+  echo "$templates"
+}
+
+list_templates() {
+    echo "Available LXC Templates:"
+    ls /var/lib/vz/template/cache/ | grep -E '\.tar\.(gz|zst)$'
+}
+

@@ -6,7 +6,7 @@
 
 `console.sh` Enters directly into the container
 
-`clone-deve-ct-codium.sh` Clones the ct 112 which is VSCodium for web
+`clone-deve-ct-codium.sh` Clones a container
 
 ## Example
 Creation of a base template from Debian and subsequent use of the same
@@ -81,7 +81,8 @@ The file `config.json` is a configuration file in JSON format and has the follow
 ```json
 {
     "ctid": {
-        "initial_value": 100
+        "containers": 200,
+        "templates": 100
     },
     "network": {
         "bridge": {
